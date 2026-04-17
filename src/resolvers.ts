@@ -112,7 +112,7 @@ export const resolvers = {
 
     Subscription: {
         cvChanged: {
-            subscribe: () => (pubsub as any).asyncIterator([CV_CHANGED]),
+            subscribe: () => pubsub.asyncIterableIterator([CV_CHANGED]),
         },
     },
 };
