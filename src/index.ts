@@ -1,19 +1,60 @@
 import { ApolloServer } from "@apollo/server";
-import { startStandaloneServer } from "@apollo/server/standalone";
-import { typeDefs }  from "./schema";
+import { expressMiddleware } from "@apollo/server/express4";
+import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
+import { makeExecutableSchema } from "@graphql-tools/schema";
+import { useServer } from "graphql-ws/lib/use/ws";
+import cors from "cors";
+import bodyParser from "body-parser";
+import express from "express";
+import http from "http";
+import { WebSocketServer } from "ws";
+import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers";
-import { context }   from "./context";
+import { context as createContext } from "./context";
 
 async function main() {
+    const app = express();
+    const httpServer = http.createServer(app);
+
+    const schema = makeExecutableSchema({ typeDefs, resolvers });
+
+    const wsServer = new WebSocketServer({ server: httpServer, path: "/graphql" });
+    const serverCleanup = useServer(
+        {
+            schema,
+            context: async () => createContext(),
+        },
+        wsServer,
+    );
+
     const server = new ApolloServer({
-        typeDefs,
-        resolvers,
+        schema,
+        plugins: [
+            ApolloServerPluginDrainHttpServer({ httpServer }),
+            {
+                async serverWillStart() {
+                    return {
+                        async drainServer() {
+                            await serverCleanup.dispose();
+                        },
+                    };
+                },
+            },
+        ],
     });
-    const { url } = await startStandaloneServer(server, {
-        context,
-        listen: { port: 4000 },
+
+    await server.start();
+
+    app.use(
+        "/graphql",
+        cors(),
+        bodyParser.json(),
+        expressMiddleware(server, { context: createContext }),
+    );
+
+    httpServer.listen(4000, () => {
+        console.log("Server ready at http://localhost:4000/graphql");
     });
-    console.log(`🚀 Server ready at ${url}`);
 }
 
 main();
