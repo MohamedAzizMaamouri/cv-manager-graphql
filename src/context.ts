@@ -1,13 +1,11 @@
-import { cvs, users, skills } from "./db";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 export interface AppContext {
-    db: {
-        cvs:    typeof cvs;
-        users:  typeof users;
-        skills: typeof skills;
-    };
+    db: PrismaClient;
 }
 
 export const context = async (): Promise<AppContext> => ({
-    db: { cvs, users, skills },
+    db: prisma,
 });
